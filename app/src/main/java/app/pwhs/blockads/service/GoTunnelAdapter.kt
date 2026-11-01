@@ -282,7 +282,8 @@ class GoTunnelAdapter(
         socketProtector: ((Int) -> Boolean)? = null,
         ssConfigJson: String = "",
         proxyProtocol: String = "",
-        proxyConfigJson: String = ""
+        proxyConfigJson: String = "",
+        dnsOnly: Boolean = false,
     ) {
         if (isRunning) return
         isRunning = true
@@ -298,6 +299,7 @@ class GoTunnelAdapter(
         }
 
         val mitmMode = httpsFilteringEnabled &&
+            !dnsOnly &&
             certDir.isNotEmpty() &&
             wgConfigJson.isEmpty() &&
             proxyConfigJson.isEmpty() &&
@@ -357,6 +359,9 @@ class GoTunnelAdapter(
         if (wgConfigJson.isNotEmpty()) {
             Timber.d("Starting Go tunnel engine in WIREGUARD mode (fd=$fd)")
             engine.start(fd.toLong(), protector, wgConfigJson)
+        } else if (dnsOnly) {
+            Timber.d("Starting Go tunnel engine in DNS-ONLY mode (fd=$fd)")
+            engine.start(fd.toLong(), protector, "")
         } else {
             Timber.d("Starting Go tunnel engine in FULL-TUNNEL mode (fd=$fd, mitm=$mitmMode)")
             engine.startFull(fd.toLong(), protector)

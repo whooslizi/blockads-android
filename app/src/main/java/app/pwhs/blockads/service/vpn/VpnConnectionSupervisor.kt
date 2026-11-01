@@ -123,10 +123,13 @@ class VpnConnectionSupervisor(
         connectionQualityProbe = ConnectionQualityProbe(socketProtector, isEngineRunning)
 
         connectionProbeJob = scope.launch {
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
             var consecutiveVpnStalls = 0
             while (isRunningProvider()) {
                 delay(CONNECTION_PROBE_INTERVAL_MS)
                 if (!isRunningProvider()) break
+                // Each probe wakes the radio; a tunnel that stalls with the screen off is caught on the next wake.
+                if (powerManager?.isInteractive != true) continue
 
                 val probe = connectionQualityProbe ?: break
                 val result = probe.runDiagnosis()
@@ -188,17 +191,17 @@ class VpnConnectionSupervisor(
         notificationUpdateJob?.cancel()
         notificationUpdateJob = scope.launch {
             val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
-            while (isRunningProvider()) {
-                try {
-                    onRefreshStats()
+            try {
+                onRefreshStats()
+                while (isRunningProvider()) {
                     delay(NOTIFICATION_UPDATE_INTERVAL_MS)
                     if (isRunningProvider() && powerManager?.isInteractive == true) {
+                        onRefreshStats()
                         onUpdateNotification()
                     }
-                } catch (e: Exception) {
-                    Timber.e(e, "Error updating notification")
-                    break
                 }
+            } catch (e: Exception) {
+                Timber.e(e, "Error updating notification")
             }
         }
     }

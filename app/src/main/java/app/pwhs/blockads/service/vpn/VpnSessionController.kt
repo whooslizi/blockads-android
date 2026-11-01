@@ -53,6 +53,7 @@ class VpnSessionController(
 
     private var vpnInterface: ParcelFileDescriptor? = null
     @Volatile private var resolvedWgConfigJson: String = ""
+    @Volatile private var dnsOnly: Boolean = false
     var vpnStartTime: Long = 0L
         private set
     @Volatile var todayBlockedCount: Int = 0
@@ -142,6 +143,7 @@ class VpnSessionController(
                         is TunnelResult.Success -> {
                             vpnInterface = tunnelRes.vpnInterface
                             resolvedWgConfigJson = tunnelRes.resolvedWgConfigJson
+                            dnsOnly = tunnelRes.dnsOnly
                             vpnEstablished = true
                             host.cancelWireGuardConfigIssue()
                         }
@@ -206,7 +208,7 @@ class VpnSessionController(
                 engine.startFilterUpdateWatcher(this)
 
                 vpnInterface?.let { pfd ->
-                    engine.startTunnel(pfd, resolvedWgConfigJson, httpsFilteringEnabled)
+                    engine.startTunnel(pfd, resolvedWgConfigJson, httpsFilteringEnabled, dnsOnly)
                 }
 
             } catch (e: CancellationException) {

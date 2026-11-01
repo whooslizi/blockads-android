@@ -19,7 +19,8 @@ import java.net.InetAddress
 sealed interface TunnelResult {
     data class Success(
         val vpnInterface: ParcelFileDescriptor,
-        val resolvedWgConfigJson: String
+        val resolvedWgConfigJson: String,
+        val dnsOnly: Boolean = false,
     ) : TunnelResult
 
     data object PermissionRevoked : TunnelResult
@@ -43,6 +44,7 @@ class VpnTunnelBuilder(
                 appPrefs.getRoutingModeSnapshot()
             }
             var resolvedWgConfigJson = ""
+            val dnsOnly = routingMode == AppPreferences.ROUTING_MODE_DIRECT && !needsFullCapture()
             val isWg = when (routingMode) {
                 AppPreferences.ROUTING_MODE_WIREGUARD -> true
                 AppPreferences.ROUTING_MODE_PROXY_VPN -> runBlocking { appPrefs.getActiveProxyTypeSnapshot() } == AppPreferences.PROXY_TYPE_WIREGUARD
@@ -168,7 +170,7 @@ class VpnTunnelBuilder(
                 }
                 val allowIpv6 = preferredIp != AppPreferences.PREFERRED_IP_IPV4
                 val allowIpv4 = true
-                Timber.d("Establishing VPN in direct mode (fullTunnel=true, excludeLan=$excludeLan, preferredIp=$preferredIp)")
+                Timber.d("Establishing VPN in direct mode (dnsOnly=$dnsOnly, excludeLan=$excludeLan, preferredIp=$preferredIp)")
                 val appName = vpnService.getString(R.string.app_name)
                 val b = vpnService.Builder()
                     .setSession(if (isSs) "$appName Outline" else appName)
@@ -182,13 +184,13 @@ class VpnTunnelBuilder(
                     b.addRoute("fd00::1", 128)
                     b.addDnsServer("fd00::1")
                 }
-                if (allowIpv4) {
+                if (allowIpv4 && !dnsOnly) {
                     addIpv4Routes(b, excludeLan)
                 }
-                if (allowIpv6) {
+                if (allowIpv6 && !dnsOnly) {
                     addIpv6Routes(b, excludeLan)
                 }
-                if (excludeLan && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (excludeLan && !dnsOnly && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     try {
                         if (allowIpv4) {
                             b.excludeRoute(IpPrefix(InetAddress.getByName("10.0.0.0"), 8))
@@ -267,7 +269,7 @@ class VpnTunnelBuilder(
                         Timber.w(e, "Failed to set TUN O_NONBLOCK via fcntl")
                     }
                 }
-                TunnelResult.Success(pfd, resolvedWgConfigJson)
+                TunnelResult.Success(pfd, resolvedWgConfigJson, dnsOnly)
             } else {
                 Timber.e("Failed to establish VPN interface")
                 TunnelResult.Failure
@@ -313,6 +315,14 @@ class VpnTunnelBuilder(
         }
 
         return config.copy(peers = resolvedPeers)
+    }
+
+    // Forwarding every app's packets in userspace costs CPU, so capture them only for features that inspect non-DNS traffic.
+    private fun needsFullCapture(): Boolean = runBlocking {
+        appPrefs.getHttpsFilteringEnabledSnapshot() ||
+            appPrefs.getBlockDohBypassSnapshot() ||
+            appPrefs.getBlockWebRtcLeakSnapshot() ||
+            appPrefs.firewallEnabled.first()
     }
 
     private fun addIpv4Routes(builder: VpnService.Builder, excludeLan: Boolean) {

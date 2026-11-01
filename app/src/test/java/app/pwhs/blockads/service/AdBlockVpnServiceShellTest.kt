@@ -142,7 +142,7 @@ class AdBlockVpnServiceShellTest {
         assertTrue(shadowOf(service).isForegroundStopped.not())
 
         awaitTrue(message = "RUNNING") { AdBlockVpnService.isRunning }
-        awaitTrue(message = "engine start") { runCatching { verify { engine.startFull(any(), any()) } }.isSuccess }
+        awaitTrue(message = "engine start") { runCatching { verify { engine.start(any(), any(), "") } }.isSuccess }
         assertEquals(listOf(true), vpnEnabledWrites)
         assertTrue(AdBlockVpnService.startTimestamp > 0)
     }

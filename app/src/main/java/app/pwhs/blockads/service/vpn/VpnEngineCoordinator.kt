@@ -179,6 +179,7 @@ class VpnEngineCoordinator(
         resolvedWgConfigJson: String,
         httpsFilteringEnabled: Boolean,
         certDir: String,
+        dnsOnly: Boolean = false,
         socketProtector: (Int) -> Boolean
     ) {
         val routingMode = appPrefs.getRoutingModeSnapshot()
@@ -227,7 +228,8 @@ class VpnEngineCoordinator(
             filterHttp3 = filterHttp3,
             blockDohBypass = blockDohBypass,
             blockWebRtc = blockWebRtc,
-            socketProtector = socketProtector
+            socketProtector = socketProtector,
+            dnsOnly = dnsOnly,
         )
     }
 

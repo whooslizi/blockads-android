@@ -6,6 +6,7 @@ import app.pwhs.blockads.data.datastore.AppPreferences
 import app.pwhs.blockads.service.vpn.VpnConnectionSupervisor
 import app.pwhs.blockads.utils.BatteryMonitor
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkConstructor
@@ -209,6 +210,25 @@ class VpnConnectionSupervisorTest {
         val refreshesAtStop = statsRefreshes
         advanceTimeBy(600_000)
         assertEquals(refreshesAtStop, statsRefreshes)
+    }
+
+    @Test
+    fun `screen off pauses probes and stats until it comes back on`() = runTest {
+        stubProbe(*Array(10) { ConnectionStatus.HEALTHY })
+        running = true
+        interactive = false
+        val s = supervisor()
+        s.startPeriodicMonitoring()
+
+        advanceTimeBy(300_001)
+        coVerify(exactly = 0) { anyConstructed<ConnectionQualityProbe>().runDiagnosis() }
+        assertEquals("only the startup refresh", 1, statsRefreshes)
+
+        interactive = true
+        advanceTimeBy(60_000)
+        coVerify(exactly = 1) { anyConstructed<ConnectionQualityProbe>().runDiagnosis() }
+        assertEquals(3, statsRefreshes)
+        s.stopPeriodicMonitoring()
     }
 
     @Test

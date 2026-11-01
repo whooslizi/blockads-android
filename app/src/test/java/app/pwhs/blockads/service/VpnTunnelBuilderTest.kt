@@ -19,6 +19,7 @@ import io.mockk.unmockkAll
 import kotlinx.coroutines.flow.flowOf
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Ignore
@@ -35,7 +36,15 @@ class VpnTunnelBuilderTest {
     private var wgJson: String? = null
     private var excludeLan = false
     private var allowAppBypass = false
+    private var httpsFiltering = false
+    private var blockDoh = false
+    private var blockWebRtc = false
+    private var firewall = false
     private val prefs: AppPreferences = mockk {
+        coEvery { getHttpsFilteringEnabledSnapshot() } answers { httpsFiltering }
+        coEvery { getBlockDohBypassSnapshot() } answers { blockDoh }
+        coEvery { getBlockWebRtcLeakSnapshot() } answers { blockWebRtc }
+        every { firewallEnabled } answers { flowOf(firewall) }
         coEvery { getRoutingModeSnapshot() } answers { this@VpnTunnelBuilderTest.routingMode }
         coEvery { getWgConfigJsonSnapshot() } answers { wgJson }
         coEvery { getActiveProxyTypeSnapshot() } returns AppPreferences.PROXY_TYPE_WIREGUARD
@@ -106,7 +115,29 @@ class VpnTunnelBuilderTest {
     }
 
     @Test
-    fun `direct mode is a full tunnel that routes IPv4 and IPv6 and excludes whitelist`() {
+    fun `direct mode captures only DNS when nothing inspects other traffic`() {
+        val result = establish() as TunnelResult.Success
+        assertTrue(result.dnsOnly)
+        assertEquals(setOf("100.64.100.1/32", "fd00::1/128"), routes.toSet())
+    }
+
+    @Test
+    fun `each feature that inspects traffic keeps the full tunnel`() {
+        val toggles = listOf<(Boolean) -> Unit>(
+            { httpsFiltering = it }, { blockDoh = it }, { blockWebRtc = it }, { firewall = it },
+        )
+        for (toggle in toggles) {
+            toggle(true)
+            routes.clear()
+            assertFalse((establish() as TunnelResult.Success).dnsOnly)
+            assertTrue("0.0.0.0/0" in routes)
+            toggle(false)
+        }
+    }
+
+    @Test
+    fun `direct mode with full capture routes IPv4 and IPv6 and excludes whitelist`() {
+        blockDoh = true
         val result = establish("com.bank", "not.installed") as TunnelResult.Success
         assertEquals("", result.resolvedWgConfigJson)
         assertEquals(listOf("BlockAds"), sessions)
@@ -119,6 +150,7 @@ class VpnTunnelBuilderTest {
     @Test
     fun `excludeLan swaps the default route for decomposed LAN-free routes`() {
         excludeLan = true
+        blockDoh = true
         establish()
         assertTrue("0.0.0.0/0" !in routes)
         assertTrue(routes.size > 10)

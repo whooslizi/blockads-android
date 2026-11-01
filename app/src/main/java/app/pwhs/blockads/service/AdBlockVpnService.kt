@@ -376,11 +376,13 @@ class AdBlockVpnService : VpnService() {
             vpnInterface: ParcelFileDescriptor,
             resolvedWgConfigJson: String,
             httpsFilteringEnabled: Boolean,
+            dnsOnly: Boolean,
         ) = engineCoordinator.startTunnel(
             goTunnelAdapter = goTunnelAdapter,
             vpnInterface = vpnInterface,
             resolvedWgConfigJson = resolvedWgConfigJson,
             httpsFilteringEnabled = httpsFilteringEnabled,
+            dnsOnly = dnsOnly,
             certDir = filesDir.absolutePath,
             socketProtector = { fd ->
                 try {

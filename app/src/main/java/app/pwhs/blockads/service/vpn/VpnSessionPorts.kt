@@ -37,7 +37,7 @@ interface VpnSessionEngine {
     suspend fun prepareStartupConfig(): StartupConfig
     suspend fun configure(config: StartupConfig)
     fun startFilterUpdateWatcher(scope: CoroutineScope)
-    suspend fun startTunnel(vpnInterface: ParcelFileDescriptor, resolvedWgConfigJson: String, httpsFilteringEnabled: Boolean)
+    suspend fun startTunnel(vpnInterface: ParcelFileDescriptor, resolvedWgConfigJson: String, httpsFilteringEnabled: Boolean, dnsOnly: Boolean)
     fun stop()
 }
 

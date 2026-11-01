@@ -60,6 +60,13 @@ class GoTunnelAdapterTest {
     }
 
     @Test
+    fun `dns-only mode starts the legacy engine with no WireGuard config`() {
+        f.adapter.start(f.tunFd, dnsOnly = true)
+        verify { f.engine.start(42L, any(), "") }
+        verify(exactly = 0) { f.engine.startFull(any(), any()) }
+    }
+
+    @Test
     fun `direct mode starts the full-tunnel engine without the TCP stack`() {
         f.adapter.start(f.tunFd)
         verify { f.engine.setUseTcpStack(false) }
